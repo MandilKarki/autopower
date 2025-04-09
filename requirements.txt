@@ -1,0 +1,9 @@
+python-pptx==0.6.18
+requests==2.31.0
+json5==0.9.11
+ollama==0.2.1
+chromadb==0.4.21
+langchain==0.3.23
+matplotlib==3.8.2
+pdfplumber==0.10.2
+numpy==1.26.3
