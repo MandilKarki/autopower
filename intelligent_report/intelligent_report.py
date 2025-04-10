@@ -11,6 +11,8 @@ from .document_processor import DocumentProcessor
 from .data_analysis import DataAnalyzer
 from .visualization import VisualizationManager
 from .section_manager import SectionManager
+from .document_manager import DocumentManager
+from .pdf_template_manager import PDFTemplateManager
 from .config import ReportConfig
 
 
@@ -31,7 +33,6 @@ class IntelligentReportGenerator:
             report_title = self.config.get("report", "title", "Intelligent Report")
             
         self.report_title = report_title
-        self.referenced_documents = []
         self.creation_date = datetime.now().strftime("%Y-%m-%d")
         
         # Use model from config if not provided
@@ -48,11 +49,37 @@ class IntelligentReportGenerator:
         viz_dir = self.config.get("output", "visualization_dir", "temp")
         self.viz_manager = VisualizationManager(viz_dir)
         
+        # Initialize RAG processor
         self.rag_processor = RAGProcessor(self.ai_manager)
+        
+        # Initialize document manager (for managing document collections)
+        documents_dir = self.config.get("documents", "base_dir", "documents")
+        self.document_manager = DocumentManager(documents_dir)
+        
+        # Set default document collection if specified in config
+        default_collection = self.config.get("documents", "default_collection", None)
+        if default_collection:
+            # Create collection if it doesn't exist
+            if default_collection not in [c["name"] for c in self.document_manager.list_collections()]:
+                self.document_manager.create_collection(
+                    default_collection, 
+                    "Default document collection from config"
+                )
+            else:
+                self.document_manager.switch_collection(default_collection)
+        
+        # Initialize PDF template manager
+        pdf_templates_dir = self.config.get("output", "pdf_templates_dir", "pdf_templates")
+        self.pdf_manager = PDFTemplateManager(pdf_templates_dir)
+        
+        # Load referenced documents from config if available
+        self.referenced_documents = []
+        self._load_referenced_documents()
         
         # Create output directories if they don't exist
         os.makedirs("output", exist_ok=True)
         os.makedirs(viz_dir, exist_ok=True)
+        os.makedirs(pdf_templates_dir, exist_ok=True)
     
     def add_user_section(self, section_title: str, content: str, order: Optional[int] = None) -> 'IntelligentReportGenerator':
         """Add a user-provided section to the report"""
@@ -154,7 +181,22 @@ class IntelligentReportGenerator:
             
         return self
     
-    def ingest_document(self, file_path: str) -> bool:
+    def _load_referenced_documents(self):
+        """Load referenced documents from config"""
+        # Get document references from config
+        references = self.config.get("rag", "references", [])
+        
+        # Add documents from active collection if available
+        if self.document_manager.active_collection:
+            collection_docs = self.document_manager.get_active_documents()
+            references.extend([doc for doc in collection_docs if doc not in references])
+        
+        # Add each document to the referenced_documents list
+        for path in references:
+            if os.path.exists(path) and path not in self.referenced_documents:
+                self.referenced_documents.append(path)
+    
+    def ingest_document(self, file_path: str, add_to_collection: bool = True) -> bool:
         """Process and add document to RAG system for querying"""
         try:
             if not os.path.exists(file_path):
@@ -180,18 +222,50 @@ class IntelligentReportGenerator:
             
             # Add to referenced_documents if successful
             if success:
-                self.referenced_documents.append(file_path)
+                if file_path not in self.referenced_documents:
+                    self.referenced_documents.append(file_path)
+                
+                # Add to the active document collection if requested
+                if add_to_collection and self.document_manager.active_collection:
+                    self.document_manager.add_document(file_path, {
+                        "type": os.path.splitext(file_path)[1],
+                        "added_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    })
                 
                 # Save to config if needed
                 if self.config.get("rag", "save_references", True):
                     references = self.config.get("rag", "references", [])
-                    references.append(file_path)
-                    self.config.set("rag", "references", references)
+                    if file_path not in references:
+                        references.append(file_path)
+                        self.config.set("rag", "references", references)
             
             return success
         except Exception as e:
             print(f"Error ingesting document: {e}")
             return False
+            
+    def remove_document(self, file_path: str, remove_from_collection: bool = True) -> bool:
+        """Remove a document from the RAG system"""
+        # Remove from referenced_documents list
+        if file_path in self.referenced_documents:
+            self.referenced_documents.remove(file_path)
+            
+            # Remove from collection if requested
+            if remove_from_collection and self.document_manager.active_collection:
+                self.document_manager.remove_document(file_path)
+                
+            # Update config if needed
+            if self.config.get("rag", "save_references", True):
+                references = self.config.get("rag", "references", [])
+                if file_path in references:
+                    references.remove(file_path)
+                    self.config.set("rag", "references", references)
+            
+            print(f"Document removed: {file_path}")
+            return True
+        
+        print(f"Document not found in referenced documents: {file_path}")
+        return False
     
     def load_data_from_file(self, file_path: str) -> bool:
         """Load data from a CSV, Excel, or JSON file for analysis"""
@@ -246,6 +320,67 @@ class IntelligentReportGenerator:
             self.config.set("visualizations", "history", viz_history)
         
         return result
+    
+    # Document Collection Management Methods
+    def create_document_collection(self, name: str, description: str = "") -> bool:
+        """Create a new document collection"""
+        return self.document_manager.create_collection(name, description)
+    
+    def switch_document_collection(self, name: str) -> bool:
+        """Switch to a different document collection"""
+        success = self.document_manager.switch_collection(name)
+        if success:
+            # Reload referenced documents to use the new collection
+            self.referenced_documents = []
+            self._load_referenced_documents()
+        return success
+    
+    def list_document_collections(self) -> List[Dict]:
+        """List all document collections"""
+        return self.document_manager.list_collections()
+    
+    def list_documents(self, collection_name: Optional[str] = None) -> List[Dict]:
+        """List documents in a collection"""
+        return self.document_manager.list_documents(collection_name)
+    
+    def clear_document_collection(self, name: Optional[str] = None) -> bool:
+        """Clear all documents from a collection"""
+        success = self.document_manager.clear_collection(name)
+        if success and (name is None or name == self.document_manager.active_collection):
+            # Reload referenced documents
+            self.referenced_documents = []
+            self._load_referenced_documents()
+        return success
+    
+    def delete_document_collection(self, name: str) -> bool:
+        """Delete a document collection"""
+        success = self.document_manager.delete_collection(name)
+        if success:
+            # Reload referenced documents if we were using that collection
+            self.referenced_documents = []
+            self._load_referenced_documents()
+        return success
+    
+    def ingest_document_directory(self, directory_path: str, file_types: Optional[List[str]] = None) -> int:
+        """Ingest all documents in a directory"""
+        if not os.path.isdir(directory_path):
+            print(f"Error: Directory {directory_path} does not exist")
+            return 0
+            
+        # Default file types if none provided
+        if file_types is None:
+            file_types = [".pdf", ".txt", ".md", ".doc", ".docx"]
+            
+        success_count = 0
+        for root, _, files in os.walk(directory_path):
+            for file in files:
+                if any(file.lower().endswith(ext) for ext in file_types):
+                    file_path = os.path.join(root, file)
+                    if self.ingest_document(file_path):
+                        success_count += 1
+                        
+        print(f"Successfully ingested {success_count} documents from {directory_path}")
+        return success_count
     
     def rag_query(self, section_title: str, query: str, order: Optional[int] = None) -> 'IntelligentReportGenerator':
         """Query ingested documents and add the results as a section"""
@@ -384,6 +519,82 @@ class IntelligentReportGenerator:
         
         # Generate the presentation
         return ppt_gen.generate(output_path)
+        
+    # PDF Template Methods
+    def list_pdf_templates(self) -> List[str]:
+        """List available PDF templates"""
+        return self.pdf_manager.list_templates()
+    
+    def create_pdf_template(self, template_name: str, sections: Optional[List[str]] = None) -> str:
+        """
+        Create a new PDF template with placeholders for sections
+        
+        Args:
+            template_name: Name for the template
+            sections: Optional list of section names (uses current sections if None)
+            
+        Returns:
+            Path to the created template
+        """
+        # If no sections provided, use current section titles
+        if sections is None:
+            sections = [section.title for section in self.section_manager.get_sections_in_order()]
+            
+        # Create the template
+        return self.pdf_manager.create_empty_template(template_name, sections)
+    
+    def generate_pdf_from_template(self, template_name: str, output_path: Optional[str] = None) -> str:
+        """
+        Generate a PDF report from a template using the current report sections
+        
+        Args:
+            template_name: Name of the template to use
+            output_path: Path to save the PDF (uses config if None)
+            
+        Returns:
+            Path to the generated PDF
+        """
+        # Use output path from config if not provided
+        if output_path is None:
+            output_path = self.config.get("output", "pdf", "output/report.pdf")
+            
+        # Create content dictionary
+        content = {
+            "title": self.report_title,
+            "subtitle": self.config.get("report", "subtitle", "Generated Report")
+        }
+        
+        # Add sections
+        for section in self.section_manager.get_sections_in_order():
+            key = section.title.lower().replace(" ", "_")
+            content[key] = section.content
+            
+        # Generate PDF
+        return self.pdf_manager.generate_pdf_from_template(template_name, content, output_path)
+    
+    def generate_pdf(self, output_path: Optional[str] = None) -> str:
+        """
+        Generate a PDF report directly from the current sections
+        
+        Args:
+            output_path: Path to save the PDF (uses config if None)
+            
+        Returns:
+            Path to the generated PDF
+        """
+        # Use output path from config if not provided
+        if output_path is None:
+            output_path = self.config.get("output", "pdf", "output/report.pdf")
+            
+        # Get report title and subtitle
+        title = self.report_title
+        subtitle = self.config.get("report", "subtitle", "Generated Report")
+        
+        # Get sections in order
+        sections = self.section_manager.get_sections_in_order()
+        
+        # Generate PDF
+        return self.pdf_manager.generate_pdf_from_sections(sections, title, subtitle, output_path)
 
     # Methods for working with templates and configs
     def load_template(self, template_path: str) -> bool:

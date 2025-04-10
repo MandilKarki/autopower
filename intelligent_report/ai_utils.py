@@ -11,57 +11,23 @@ class AIManager:
     Manages interactions with AI models and embeddings
     """
     
-    def __init__(self, model_name: str = None):
-        # Configure Ollama to use localhost
+    def __init__(self, model_name: str = "llama3"):
+        # Always use localhost for Ollama
         ollama.BASE_URL = "http://localhost:11434"
         
-        # Get available models
-        self.available_models = self._get_available_models()
-        
-        # Check if llama3.2 is available, otherwise try to pull it
-        if "llama3.2" not in self.available_models:
-            print("llama3.2 model not found. Attempting to pull it...")
-            try:
-                # Try to pull llama3 model (this can take time for first run)
-                ollama.pull("llama3.2")
-                # Refresh model list
-                self.available_models = self._get_available_models()
-                print("Successfully pulled llama3.2 model")
-            except Exception as e:
-                print(f"Warning: Could not pull llama3.2 model: {e}")
-        
-        # Prioritize llama3.2, then user's choice, then available models
-        if "llama3.2" in self.available_models:
-            self.model_name = "llama3.2"
-        elif model_name is not None and model_name in self.available_models:
-            self.model_name = model_name
-        else:
-            # Fallback to first available model or default
-            self.model_name = self.available_models[0] if self.available_models else "llama3"
-            if model_name is not None and model_name != self.model_name:
-                print(f"Warning: Model {model_name} not available. Using {self.model_name} instead.")
+        # Directly set the model name
+        self.model_name = model_name if model_name else "llama3"
         
         print(f"Using AI model: {self.model_name}")
-    
-    def _get_available_models(self) -> List[str]:
-        """Get list of available Ollama models"""
-        try:
-            response = ollama.list()
-            return [model['name'] for model in response['models']]
-        except Exception as e:
-            print(f"Warning: Could not retrieve model list from Ollama: {e}")
-            return []
     
     def generate_content(self, prompt: str) -> str:
         """Generate content using the AI model"""
         try:
-            response = ollama.chat(model=self.model_name, messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ])
-            
+            # Simple chat call to Ollama
+            response = ollama.chat(
+                model=self.model_name, 
+                messages=[{"role": "user", "content": prompt}]
+            )
             return response['message']['content']
         except Exception as e:
             print(f"Error generating content: {e}")
@@ -70,30 +36,31 @@ class AIManager:
     def get_embeddings(self, text: str) -> List[float]:
         """Get embeddings for text using the AI model"""
         try:
-            embedding_response = ollama.embeddings(
-                model=self.model_name,
-                prompt=text
-            )
-            
-            return embedding_response['embedding']
+            # Simple embeddings call
+            response = ollama.embeddings(model=self.model_name, prompt=text)
+            return response['embedding']
         except Exception as e:
             print(f"Error getting embeddings: {e}")
             return []
     
     def parse_json_response(self, json_text: str) -> Any:
-        """Parse JSON from AI response, handling markdown code blocks"""
+        """Parse JSON from AI response"""
         import json
         
-        # Try to extract JSON if it's embedded in markdown code blocks
-        json_matches = re.findall(r'```(?:json)?\s*(.+?)\s*```', json_text, re.DOTALL)
-        if json_matches:
-            json_text = json_matches[0]
+        # Simple JSON extraction and parsing
+        if '```' in json_text:
+            # Get content between code blocks
+            start = json_text.find('```') + 3
+            end = json_text.rfind('```')
+            # Skip language identifier if present
+            if 'json' in json_text[start:start+10]:
+                start = json_text.find('\n', start) + 1
+            json_text = json_text[start:end].strip()
             
         try:
             return json.loads(json_text)
-        except json.JSONDecodeError as e:
-            print(f"Warning: Could not parse JSON response: {e}")
-            return {"error": "Could not parse JSON", "raw_response": json_text}
+        except json.JSONDecodeError:
+            return {"error": "Invalid JSON", "text": json_text}
 
 
 class RAGProcessor:
