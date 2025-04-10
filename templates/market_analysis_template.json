@@ -1,0 +1,65 @@
+{
+    "report": {
+        "title": "Market Analysis Report Template",
+        "subtitle": "Comprehensive Market Insights",
+        "author": "AI Report Generator",
+        "company": "Autopower Analytics"
+    },
+    "sections": {
+        "executive_summary": {
+            "title": "Executive Summary",
+            "type": "user",
+            "order": 1,
+            "template": "This section should provide a concise overview of the report findings.\n\nKey points to address:\n- Market overview\n- Major trends identified\n- Critical insights for decision makers\n- Recommendations"
+        },
+        "industry_overview": {
+            "title": "Industry Overview",
+            "type": "ai",
+            "order": 2,
+            "prompt": "Current state of the technology industry, including major trends, disruptions, and growth sectors",
+            "detailed": true
+        },
+        "key_trends": {
+            "title": "Key Market Trends",
+            "type": "ai",
+            "order": 3,
+            "prompt": "Emerging trends in market consumer behavior and technology adoption patterns",
+            "detailed": false
+        },
+        "competitive_landscape": {
+            "title": "Competitive Landscape",
+            "type": "user",
+            "order": 4,
+            "template": "Analysis of major competitors and market positioning.\n\nThis section should be customized with specific company information."
+        }
+    },
+    "visualizations": {
+        "auto_generate": true,
+        "auto_count": 2,
+        "custom": [
+            {
+                "title": "Sector Growth Comparison",
+                "type": "bar",
+                "columns": [
+                    "Sector",
+                    "Growth"
+                ],
+                "description": "Comparison of growth rates across different market sectors"
+            },
+            {
+                "title": "Revenue Distribution",
+                "type": "boxplot",
+                "columns": [
+                    "Sector",
+                    "Revenue"
+                ],
+                "description": "Distribution of revenue across market sectors"
+            }
+        ]
+    },
+    "output": {
+        "markdown": "output/report.md",
+        "powerpoint": "output/presentation.pptx",
+        "visualization_dir": "output/images"
+    }
+}

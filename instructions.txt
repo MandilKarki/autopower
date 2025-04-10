@@ -1,0 +1,94 @@
+Project Title: AI-Powered Intelligent PDF Report Generator
+Overview
+
+This project aims to develop a modular AI-powered PDF Generator that can compile clean, coherent, and customized reports using user input, AI-generated content, uploaded data, and extracted information from external documents. The system will feature both a graphical user interface (GUI) and an API for seamless integration and automation.
+Core Features
+1. User Input & Configuration (GUI + API)
+
+    Collect inputs via GUI or API such as:
+
+        Report Title
+
+        Section Titles
+
+        User-provided content
+
+        Preferences for layout, formatting, and included sections
+
+2. AI-Generated Content
+
+    Use an LLM to:
+
+        Generate coherent and context-aware text for sections like introductions, summaries, or analysis
+
+        Assist with paraphrasing or enhancing user-provided notes
+
+        Optionally expand on raw keywords or bullet points to full paragraphs
+
+3. Document Retrieval & Integration (RAG)
+
+    Ingest reference documents (PDF, DOCX, TXT)
+
+    Index content into ChromaDB as embeddings
+
+    Use Retrieval-Augmented Generation (RAG) to:
+
+        Pull relevant context
+
+        Answer queries for specific sections
+
+        Include factual, cited content in the final PDF
+
+4. Data Visualization
+
+    Accept structured data (CSV, Excel, JSON)
+
+    Auto-generate meaningful graphs (bar, pie, line, etc.)
+
+    Allow users to select graph types and customize titles/labels
+
+    Insert visuals into the final PDF in proper layout sections
+
+5. PDF Assembly
+
+    Generate a polished PDF with:
+
+        Cover page, table of contents
+
+        Structured content (headings, paragraphs, AI-generated sections)
+
+        Visualizations and captions
+
+        Footer, page numbers, logo, and metadata
+
+Architecture & Stack (Initial Implementation)
+
+    Backend: Python (FastAPI or Flask)
+
+    Frontend: Streamlit (for simplicity and speed)
+
+    AI Layer: OpenAI or Ollama LLMs via API
+
+    Vector Store: ChromaDB
+
+    Data Handling: Pandas, NumPy
+
+    Graphing: Matplotlib or Plotly
+
+    PDF Generation: pdfkit (HTML to PDF) or WeasyPrint
+
+Phase 1 Scope
+
+    Basic working prototype with:
+
+        Simple Streamlit GUI
+
+        API endpoint to generate PDF
+
+        One AI section generator
+
+        One visualization from CSV
+
+        Document ingestion and retrieval via Chroma
+
+    Clean, readable PDF with user content, AI content, and graphs

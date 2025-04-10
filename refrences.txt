@@ -1,0 +1,316 @@
+This is a brief guide to creating a solid foundation for creating a powerpoint from a basic template, in my case I will use GPT-4o-mini.
+Repository
+GitHub - M1T8E6/llm-powerpoint: This is a short project to create a solid foundation for creating a…
+This is a short project to create a solid foundation for creating a powerpoint from a basic template, in my case I will…
+
+github.com
+Introduction
+
+In the business world, PowerPoint presentations are an essential tool for communicating ideas, presenting data, and persuading clients or stakeholders. A well-designed presentation can be crucial to the success of a proposal, but creating high-quality slides requires time, attention to detail, and considerable synthesis skills.
+
+This is where artificial intelligence comes in. Using large language models (LLMs), the process of creating presentations can be automated and simplified. These advanced algorithms not only help generate clear and relevant content, but also support in the effective organization of information, easing the workload of those who have to prepare presentations on a regular basis.
+
+    ❗Importantly, the algorithm does not generate a PowerPoint presentation ready for professional use, but it does provide a solid base for professionals to work on, saving time and being able to focus on the final touches.
+
+In this guide, we will explore how to use an LLM to facilitate and streamline presentation creation, enabling you to turn complex ideas into effective slides with less effort and greater efficiency.
+Template
+
+The first step in creating our algorithm is to obtain a PowerPoint template. You can download your favorite template directly from Microsoft’s site or use an existing template, perhaps customized by you.
+
+In this example we will use a simple and versatile template: the Minimalist light sales pitch.
+Let’s create the algorithm
+Install Required Python Packages
+
+pip install openai requests json5 python-pptx llama-index
+
+Import the Libraries
+
+import openai
+import requests
+import json
+import os
+import re
+from llama_index.core import PromptTemplate
+from llama_index.llms.openai import OpenAI
+from pptx import Presentation
+
+Load the Template
+
+In this project, we create a folder named templates where we store the downloaded PowerPoint template. Once the template is in place, we load it and pass it to an instance of Presentation to work with it.
+
+template_path = 'templates/path'
+prs = Presentation(template_path)
+
+Calculate the Structure
+
+To properly populate our template, we need to analyze its structure. This structure helps the model understand how to generate a response that fits within the template’s layout. This is crucial to avoid errors during the data loading process. The code below extracts the layout of placeholders in the slides, including text boxes, tables, and images.
+
+slide_structures = []
+
+# Iterate through each slide in the presentation
+for slide in prs.slides:
+    structure = {"placeholders": []}
+    
+    # Iterate through each shape in the slide
+    for shape in slide.shapes:
+        if shape.is_placeholder:
+            
+            # Create a dictionary to store placeholder details
+            placeholder = {
+                "type": shape.placeholder_format.type,
+                "idx": shape.placeholder_format.idx,
+                "has_text_frame": shape.has_text_frame,
+                "name": shape.name,
+            }
+            # Check if the placeholder contains a table
+            if shape.has_table:
+                placeholder["has_table"] = True
+                # Extract the table structure as a list of rows with cell texts
+                placeholder["table_structure"] = [
+                    [cell.text for cell in row.cells] for row in shape.table.rows
+                ]
+            else:
+                placeholder["has_table"] = False
+            
+            # Check if the placeholder is an image placeholder
+            if shape.placeholder_format.type == 18:
+                placeholder["has_image"] = True
+                placeholder["image_description"] = ""
+            else:
+                placeholder["has_image"] = False
+
+            # Append the placeholder information to the structure
+            structure["placeholders"].append(placeholder)
+            
+    # Append the slide structure to the list of all slide structures
+    slide_structures.append(structure)
+
+# Convert the structure list to a JSON string for better readability
+slide_structures_str = json.dumps(slide_structures, indent=4)
+
+In this example, we’ve covered common elements found in a PowerPoint presentation, such as text, tables, and images. If your template contains other types of objects, you can extend this code to include additional logic for those elements as well.
+
+At the end of the code, we print the resulting JSON structure to clearly display the details of each placeholder. Using the pprint library is useful to get more readable and organized output, especially when working with complex data such as nested structures. Let’s see how to do it:
+
+import pprint
+pprint.pprint(slide_structures_str)
+
+This allows us to display the slide structure in a more orderly and understandable way. For example, the result might look like the following:
+
+('[\n'
+ '    {\n'
+ '        "placeholders": [\n'
+ '            {\n'
+ '                "type": 1,\n'
+ '                "idx": 0,\n'
+ '                "has_text_frame": true,\n'
+ '                "name": "Title 1",\n'
+ '                "has_table": false,\n'
+ '                "has_image": false\n'
+ '            }\n'
+ '        ]\n'
+ '    },\n'
+ '    {\n'
+ '        "placeholders": [\n'
+ '            {\n'
+ '                "type": 1,\n'
+ '                "idx": 0,\n'
+ '                "has_text_frame": true,\n'
+ '                "name": "Title 1",\n'
+ '                "has_table": false,\n'
+ '                "has_image": false\n'
+ '            },\n'
+ '            {\n'
+ '                "type": 7,\n'
+ '                "idx": 15,\n'
+ '                "has_text_frame": true,\n'
+ '                "name": "Content Placeholder 2",\n'
+ '                "has_table": false,\n'
+ '                "has_image": false\n'
+ '            },\n'
+ '        ]\n'
+ '    },\n'
+ '  ...
+ ']')
+
+Prompting
+
+Now it’s time to engage our generative AI. First, we need to obtain a JSON with the content that will populate our slide structure. To do this, the initial step is to create an appropriate prompt for this task.
+
+Here’s the prompt I developed for this purpose:
+
+prompt = """
+    You are a PowerPoint presentation specialist. You are asked to create content for a presentation about {topic}.
+    The PowerPoint template has the following structure:
+    
+    {structure}
+    
+    You need to generate content that fits into this structure, ensuring that all placeholders are filled appropriately.
+    
+    For each slide:
+    1. Provide the title for the slide.
+    2. Provide the text content for each text placeholder.
+    3. If a slide contains a table, generate appropriate data to fill it based on the provided context.
+    4. If a slide contains an image placeholder, describe the type of image that should be included.
+    
+    Return the structured information *only* as a JSON. Do not include any introductory text or explanations.
+"""
+
+Prompt Explanation
+
+To help the model understand the type of response we want to achieve, we need to provide it with the right information. The prompt contains two main variables:
+
+    topic: represents the topic of the presentation requested by the user.
+    structure: describes the structure of the PowerPoint template that the model should follow.
+
+These variables will be replaced with specific values at the time of prompt execution, ensuring that the generated content is relevant to the presentation topic and adheres to the template structure.
+
+Creating the Prompt Template
+
+The next step is to create a PromptTemplate object using LlamaIndex, which allows us to pass the prompt to the LLM in a structured and dynamic way. This approach simplifies prompt management and makes the process of interacting with the LLM more efficient.
+
+# Create a PromptTemplate object with the defined prompt
+prompt_template = PromptTemplate(template=prompt)
+
+query = "Create an example of pitch for a new product named \"Nose\", a platform that helps investors to find the best investment opportunities."
+
+content_prompt = (
+    prompt_template.format(topic=query, structure=slide_structures_str)
+)
+
+This setup allows us to easily manage the prompt and variables to be replaced, preparing us for the next step: interacting with the AI model to generate the presentation content.
+LLM
+
+We have our template structure, we have a prompt, now it’s time to use our model.
+
+llm = OpenAI(model="gpt-4o-mini", api_key=os.environ["OPENAI_API_KEY"])
+slides_response = llm.complete(content_prompt, True).text
+
+As instructed by the prompt, we expect to receive a JSON object as a response that is useful for populating our template. In fact, if we print the model’s response, we obtain the following JSON:
+
+[
+    {
+        "placeholders": [
+            {
+                "type": 1,
+                "idx": 0,
+                "has_text_frame": true,
+                "name": "Title 1",
+                "text": "Introducing Nose: Your Investment Companion"
+            }
+        ]
+    },
+    {
+        "placeholders": [
+            {
+                "type": 1,
+                "idx": 0,
+                "has_text_frame": true,
+                "name": "Title 1",
+                "text": "What is Nose?"
+            },
+            {
+                "type": 7,
+                "idx": 15,
+                "has_text_frame": true,
+                "name": "Content Placeholder 2",
+                "text": "Nose is a cutting-edge platform designed to help investors discover the best investment opportunities tailored to their preferences and risk profiles."
+            },
+        ]
+    },
+]
+
+Extracting and Decoding the JSON
+
+Once we receive the response from our model, we need to ensure that the format is as expected a JSON object that we can use to populate our template. To achieve this, we use a regular expression to extract the JSON content from the response and then decode it into a Python object:
+
+# Searching for JSON in the response
+json_match = re.search(r'```json\s*(.*?)\s*```', slides_response, re.DOTALL)
+
+# Verification and parsing of JSON
+if json_match:
+    json_content = json_match.group(1)
+    try:
+        slides = json.loads(json_content)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"JSON parsing error: {str(e)}")
+else:
+    raise ValueError("The JSON was not found in the model response.")
+
+Image Generation
+
+Our template includes images, so it would be beneficial to generate them using AI. To achieve this, we’ll create a function that generates images using DALL-E 3. We’ll use this function to populate the corresponding fields in our template
+
+def generate_image(description):
+    response = openai.images.generate(
+        model="dall-e-3",
+        prompt=description,
+        n=1,
+        response_format="url",
+    )
+    image_url = response.data[0].url
+    image_data = requests.get(image_url).content
+    return image_data
+
+Populating the PowerPoint
+
+Now that we have the PowerPoint content and the function to create images, it’s time to create a function to populate the PowerPoint template with the data provided by our LLM and the generated images:
+
+def populate_slide(slide, slide_data):
+    # Get the list of placeholders
+    placeholders = slide_data.get("placeholders", [])
+
+    # Popolare i placeholders di testo
+    for placeholder in placeholders:
+        for shape in slide.shapes:
+            if shape.is_placeholder and placeholder.get("name") in shape.name:
+                if placeholder.get("text") and shape.has_text_frame:
+                    shape.text = placeholder["text"]
+
+    # Populate text placeholders
+    for placeholder in placeholders:
+        if placeholder.get("image_description"):
+            image_data = generate_image(placeholder["image_description"])
+            img_path = "temp_image.png"
+            with open(img_path, "wb") as img_file:
+                img_file.write(image_data)
+            for shape in slide.shapes:
+                if shape.is_placeholder and shape.placeholder_format.type == 18:
+                    slide.shapes._spTree.remove(shape._element)
+                    slide.shapes.add_picture(img_path, shape.left, shape.top, shape.width, shape.height)
+                    break
+
+    # Populate the tables
+    for placeholder in placeholders:
+        table_data = placeholder.get("table_structure")
+        if table_data:
+            for shape in slide.shapes:
+                if shape.has_table:
+                    table = shape.table
+                    for i, row_data in enumerate(table_data):
+                        for j, cell_text in enumerate(row_data):
+                            table.cell(i, j).text = cell_text
+                    break
+
+Putting It All Together
+
+After defining the function, we can apply it to populate each slide in the template with the generated content and images:
+
+for i, slide_data in enumerate(slides):
+    if i < len(prs.slides):
+        populate_slide(prs.slides[i], slide_data)
+
+Saving the PowerPoint
+
+Once we’ve populated the template, we’re finally ready to save the PowerPoint presentation. Let’s save it as a new file:
+
+prs.save("save/path")
+
+Conclusion and Final Thoughts
+
+In this guide, we have created an automated workflow to generate PowerPoint presentations using AI. From understanding the template structure, to generating content, and finally populating the slides, we have seen how powerful and efficient this process can be. With the integration of image generation capabilities, the presentations become even more compelling and personalized.
+Additional Considerations:
+
+    Customization: You can enhance the template by incorporating various shapes, animations, and dynamic layouts that adapt to the content. This will create a more engaging and visually appealing presentation.
+    Template Optimization: To further refine the quality of the generated content, consider fine-tuning the model using a dataset specific to your domain. This will enable the model to produce more accurate and contextually relevant content tailored to your specific needs.
+    Extending Functionality: From this foundation, the possibilities are limitless. You can enhance the algorithm with a range of features, from automating tasks to streamline the workflow, to boosting the quality of the final output. For instance, you could integrate external data sources to generate up-to-date information, utilize different templates for specialized purposes such as text summarization or sentiment analysis, and even automate the design process to seamlessly align with various presentation themes. The potential for expansion and innovation is vast, allowing you to create a highly dynamic and versatile presentation generation system.

@@ -1,0 +1,47 @@
+{
+  "report": {
+    "title": "Custom Market Analysis 2024",
+    "subtitle": "Comprehensive Market Insights",
+    "author": "AI Report Generator",
+    "company": "Autopower Analytics",
+    "logo": ""
+  },
+  "sections": {
+    "executive_summary": {
+      "title": "Executive Summary",
+      "type": "user",
+      "order": 1
+    },
+    "industry_overview": {
+      "title": "Industry Overview",
+      "type": "ai",
+      "order": 2,
+      "prompt": "Current state of the technology industry in 2024, including major trends, disruptions, and growth sectors.",
+      "detailed": true
+    }
+  },
+  "visualizations": {
+    "auto_generate": true,
+    "auto_count": 2,
+    "custom": [
+      {
+        "title": "Market Growth Forecast",
+        "type": "bar",
+        "description": "Projected growth percentages across major industry sectors for 2024-2025.",
+        "columns": []
+      }
+    ]
+  },
+  "output": {
+    "markdown": "output/report.md",
+    "powerpoint": "output/presentation.pptx",
+    "visualization_dir": "output/images"
+  },
+  "ai_model": {
+    "name": "",
+    "temperature": 0.7
+  },
+  "data": {
+    "last_data_file": "temp/sample_data.csv"
+  }
+}
