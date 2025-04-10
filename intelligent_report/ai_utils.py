@@ -12,16 +12,35 @@ class AIManager:
     """
     
     def __init__(self, model_name: str = None):
+        # Configure Ollama to use localhost
+        ollama.BASE_URL = "http://localhost:11434"
+        
+        # Get available models
         self.available_models = self._get_available_models()
         
-        # Set default model if none provided or if provided model isn't available
-        if model_name is None or model_name not in self.available_models:
-            self.model_name = self.available_models[0] if self.available_models else "llama2"
-            if model_name is not None and model_name not in self.available_models:
-                print(f"Warning: Model {model_name} not available. Using {self.model_name} instead.")
-        else:
+        # Check if llama3.2 is available, otherwise try to pull it
+        if "llama3.2" not in self.available_models:
+            print("llama3.2 model not found. Attempting to pull it...")
+            try:
+                # Try to pull llama3 model (this can take time for first run)
+                ollama.pull("llama3.2")
+                # Refresh model list
+                self.available_models = self._get_available_models()
+                print("Successfully pulled llama3.2 model")
+            except Exception as e:
+                print(f"Warning: Could not pull llama3.2 model: {e}")
+        
+        # Prioritize llama3.2, then user's choice, then available models
+        if "llama3.2" in self.available_models:
+            self.model_name = "llama3.2"
+        elif model_name is not None and model_name in self.available_models:
             self.model_name = model_name
-            
+        else:
+            # Fallback to first available model or default
+            self.model_name = self.available_models[0] if self.available_models else "llama3"
+            if model_name is not None and model_name != self.model_name:
+                print(f"Warning: Model {model_name} not available. Using {self.model_name} instead.")
+        
         print(f"Using AI model: {self.model_name}")
     
     def _get_available_models(self) -> List[str]:
@@ -111,6 +130,46 @@ class RAGProcessor:
             return True
         except Exception as e:
             print(f"Error adding document to RAG: {e}")
+            return False
+            
+    def add_documents(self, documents: List[str], metadatas: Optional[List[Dict]] = None) -> bool:
+        """Add multiple documents to the RAG collection"""
+        if not documents:
+            return False
+            
+        # Create document IDs
+        doc_ids = [f"doc_{i}" for i in range(len(documents))]
+        
+        # Get embeddings for all documents
+        embeddings = []
+        for doc in documents:
+            embedding = self.ai_manager.get_embeddings(doc)
+            if not embedding:
+                print(f"Warning: Could not get embeddings for document")
+                continue
+            embeddings.append(embedding)
+            
+        if not embeddings or len(embeddings) != len(documents):
+            print(f"Warning: Could not get embeddings for all documents")
+            return False
+            
+        # Ensure metadatas is properly formatted
+        if metadatas is None:
+            metadatas = [{} for _ in documents]
+        elif len(metadatas) != len(documents):
+            print(f"Warning: Number of metadata items ({len(metadatas)}) does not match number of documents ({len(documents)})")
+            return False
+            
+        try:
+            self.collection.add(
+                ids=doc_ids,
+                embeddings=embeddings,
+                documents=documents,
+                metadatas=metadatas
+            )
+            return True
+        except Exception as e:
+            print(f"Error adding documents to RAG: {e}")
             return False
     
     def query(self, query_text: str, n_results: int = 3) -> Dict:
